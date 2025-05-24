@@ -1,0 +1,10 @@
+# Ignore binaries
+tmp/
+bin/
+
+# Ignoring environment variables
+.env
+config.toml
+
+# Ignoring log files
+*.log
