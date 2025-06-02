@@ -31,7 +31,7 @@ func main() {
 		log.Printf(failMsg, err)
 	}
 	defer f.Close()
-	pkg.Log = pkg.NewLoggerService(cmd.EnvVars.Environment, f)
+	pkg.Log = pkg.NewLoggerService(cmd.AppConfig.Environment, f)
 	pkg.Log.SetupInfo("[ON]: Logging service has been activated.")
 
 	// Setup valkey client
@@ -68,15 +68,17 @@ func main() {
 	router.GET("/test", jobs.TestEndpointHandler)
 	router.POST("/webhook/:id", jobs.WebhookHandler)
 
-	port := strconv.Itoa(cmd.EnvVars.ServerPort)
+	port := strconv.Itoa(cmd.AppConfig.ServerPort)
 	pkg.Log.SetupInfo("[ON]: Server configured and starting on PORT:" + port)
+
 	routerErr := router.Run(":" + port)
 	if routerErr != nil {
-		pkg.Log.SetupFail("[CRASH]: Server failed to start due to:", err)
+		pkg.Log.SetupFail("[FAIL]: Server failed to start due to:", err)
 		panic(routerErr)
 	}
-
 	pkg.Log.SetupInfo("[OFF]: Server deactivated.")
+
+	cmd.CloseValkey(pkg.Valkey)
 	pkg.Log.SetupInfo("[OFF]: Valkey deactivated.")
 	pkg.Log.SetupInfo("[OFF]: Logging service deactivated.")
 }

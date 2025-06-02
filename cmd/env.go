@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var EnvVars *EnvConfig
+var AppConfig *EnvConfig
 
 type EnvConfig struct {
 	Environment string
@@ -63,14 +63,14 @@ func SetupEnv() error {
 		return err
 	}
 
-	EnvVars = &EnvConfig{
+	AppConfig = &EnvConfig{
 		Environment: viper.GetString("server.environment"),
 		ServerHost:  viper.GetString("server.host"),
 		ServerPort:  viper.GetInt("server.port"),
 		ValkeyHost:  viper.GetString("valkey.host"),
 		ValkeyPort:  viper.GetInt("valkey.port"),
 	}
-	if err := EnvVars.Validate(); err != nil {
+	if err := AppConfig.Validate(); err != nil {
 		return err
 	}
 	return nil
