@@ -1,4 +1,4 @@
-package jobs
+package controller
 
 import (
 	"net/http"
