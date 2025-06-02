@@ -12,7 +12,6 @@ func TestEndpointHandler(c *gin.Context) {
 		"message": "Server is LIVE",
 	})
 	pkg.Log.Success(c)
-	return
 }
 
 func WebhookHandler(c *gin.Context) {
@@ -20,5 +19,4 @@ func WebhookHandler(c *gin.Context) {
 		"messsage": "Webhook event handled successfully",
 	})
 	pkg.Log.Success(c)
-	return
 }
