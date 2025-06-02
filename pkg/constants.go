@@ -65,6 +65,10 @@ const (
 	HelpSet     = "helper-set"
 	TestSet     = "testing-set"
 	FeatSet     = "feature-suggestion-set"
+
+	// This hashset behaves slightly differently. Here, there is an
+	// eviction policy so as to maintain the streak
+	EnamouredSet = "enamoured-set"
 )
 
 // SortedSets to handle leaderboard, language badges and
@@ -78,10 +82,4 @@ const (
 	GoRank      = "go-ranking-sset"
 	RustRank    = "rs-ranking-sset"
 	ZigRank     = "zig-ranking-sset"
-)
-
-// Sets for streak badges. Records with TTLs are to be added. If there is a
-// previous record
-const (
-	EnamouredSet = "enamoured-set"
 )
