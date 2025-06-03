@@ -5,7 +5,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/IAmRiteshKoushik/alfred/pkg"
 	v "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/spf13/viper"
@@ -75,9 +74,7 @@ func SetupEnv() error {
 		DatabaseURL: viper.GetString("database.url"),
 	}
 	if err := AppConfig.Validate(); err != nil {
-		pkg.Log.SetupFail("[CRASH]: invalid environment variables", err)
 		return err
 	}
-	pkg.Log.SetupInfo("[SUCCESS]: Environment variables have been read successfully")
 	return nil
 }
