@@ -15,7 +15,7 @@ func SetupValkeyHSet(names []string, client *redis.Client) error {
 
 	for _, name := range names {
 		// HSetNX sets a field only if it does not exist. We'll use a dummy field to ensure creation.
-		_, err := client.HSetNX(ctx, name, "__dummy__", "1").Result()
+		_, err := client.HSetNX(ctx, name, "__dummy__", "0").Result()
 		if err != nil {
 			return fmt.Errorf("failed to create hash set %s: %w", name, err)
 		}
