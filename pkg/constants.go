@@ -60,6 +60,7 @@ const (
 // HashSets for normal badges. These act like buckets grouping participants
 // and increasing their counter when more actions are performed in the same.
 const (
+	DocSet      = "doc-set"
 	BugSet      = "bug-hunter-set"
 	LanguageSet = "language-set"
 	HelpSet     = "helper-set"
@@ -82,4 +83,6 @@ const (
 	GoRank      = "go-ranking-sset"
 	RustRank    = "rs-ranking-sset"
 	ZigRank     = "zig-ranking-sset"
+	FlutterRank = "flutter-ranking-sset"
+	KotlinRank  = "kotlin-ranking-sset"
 )
