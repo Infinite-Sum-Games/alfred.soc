@@ -5,3 +5,6 @@ environment = "development"
 [valkey]
 port = 6379
 host = "localhost"
+
+[database]
+url = "postgres://postgres:1234@localhost:5432/postgres"
