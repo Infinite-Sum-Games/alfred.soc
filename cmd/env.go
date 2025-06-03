@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/IAmRiteshKoushik/alfred/pkg"
 	v "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/spf13/viper"
@@ -18,6 +19,7 @@ type EnvConfig struct {
 	ServerPort  int
 	ValkeyHost  string
 	ValkeyPort  int
+	DatabaseURL string
 }
 
 // isValidHost must satisfy the following interface to be accepted as a
@@ -26,7 +28,7 @@ type EnvConfig struct {
 func isValidHost(value any) error {
 	s, ok := value.(string)
 	if !ok {
-		return fmt.Errorf("Must be a string")
+		return fmt.Errorf("must be a string")
 	}
 	if strings.ToLower(s) == "localhost" {
 		return nil
@@ -37,7 +39,7 @@ func isValidHost(value any) error {
 	if err := is.URL.Validate(s); err == nil {
 		return nil
 	}
-	return fmt.Errorf("Must be 'localhost' or a valid URL/IP address")
+	return fmt.Errorf("must be 'localhost' or a valid URL/IP address")
 }
 
 func (e *EnvConfig) Validate() error {
@@ -47,6 +49,7 @@ func (e *EnvConfig) Validate() error {
 		v.Field(&e.ServerPort, v.Required, v.Min(1), v.Max(65535)),
 		v.Field(&e.ValkeyHost, v.Required, v.By(isValidHost)),
 		v.Field(&e.ValkeyPort, v.Required, v.Min(1), v.Max(65535)),
+		v.Field(&e.DatabaseURL, v.Required, is.URL),
 	)
 }
 
@@ -69,9 +72,12 @@ func SetupEnv() error {
 		ServerPort:  viper.GetInt("server.port"),
 		ValkeyHost:  viper.GetString("valkey.host"),
 		ValkeyPort:  viper.GetInt("valkey.port"),
+		DatabaseURL: viper.GetString("database.url"),
 	}
 	if err := AppConfig.Validate(); err != nil {
+		pkg.Log.SetupFail("[CRASH]: invalid environment variables", err)
 		return err
 	}
+	pkg.Log.SetupInfo("[SUCCESS]: Environment variables have been read successfully")
 	return nil
 }
