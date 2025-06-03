@@ -6,5 +6,8 @@ bin/
 .env
 config.toml
 
+# Ignoring generated sqlc code
+db/
+
 # Ignoring log files
 *.log
