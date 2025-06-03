@@ -16,3 +16,9 @@ SELECT EXISTS (
   WHERE id = $1
     AND $2 = ANY(maintainers)
 ) AS is_maintainer;
+
+-- name: UpdateRepositoryOnboardedQuery :one
+UPDATE repository 
+  SET onboarded = true
+  WHERE url = $1
+RETURNING name;
