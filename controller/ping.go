@@ -41,15 +41,3 @@ func handlePingEvent(c *gin.Context, id uuid.UUID) {
 	})
 
 }
-
-func handleIssueCommentEvent(c *gin.Context, id uuid.UUID) {
-
-}
-
-func handleIssueEvent(c *gin.Context, id uuid.UUID) {
-
-}
-
-func handlePullRequestEvent(c *gin.Context, id uuid.UUID) {
-
-}
