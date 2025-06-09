@@ -15,7 +15,7 @@ import (
 // but at the time of writing (24th May, 2025), it did not have support for
 // Streams which was a necessary requirement. If this changes in the future,
 // please make the corresponding upgrades.
-func SetupValkey() (*redis.Client, error) {
+func InitValkey() (*redis.Client, error) {
 	host := AppConfig.ValkeyHost
 	port := AppConfig.ValkeyPort
 	resp := 3

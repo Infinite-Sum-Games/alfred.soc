@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/segmentio/ksuid"
 )
@@ -18,11 +19,4 @@ func GrabRequestId(c *gin.Context) string {
 		return "missing-id"
 	}
 	return fmt.Sprintf("%v", reqId)
-}
-
-func GrabUsername(c *gin.Context) string {
-	// TODO:
-	// Utility function to grab username from the request and re-use it
-	// in the request or in error logs. Helpful in detecting spammer accounts
-	return ""
 }

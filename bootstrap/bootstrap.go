@@ -13,7 +13,6 @@ type StructureInfo struct {
 
 var Structures = []StructureInfo{
 	// Streams
-	{Name: pkg.Admin, Type: "stream"},
 	{Name: pkg.IssueClaim, Type: "stream"},
 	{Name: pkg.AutomaticEvents, Type: "stream"},
 	{Name: pkg.Bounty, Type: "stream"},
@@ -40,6 +39,7 @@ var Structures = []StructureInfo{
 	{Name: pkg.ZigRank, Type: "zset"},
 	{Name: pkg.FlutterRank, Type: "zset"},
 	{Name: pkg.KotlinRank, Type: "zset"},
+	{Name: pkg.HaskellRank, Type: "zset"},
 }
 
 // This program checks against all the existing structures required for

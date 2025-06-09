@@ -2,16 +2,6 @@ package pkg
 
 // Streams for handling Event Driven Architecture
 const (
-	// The admin-bot-stream is used to capture all commands by maintainers and
-	// admins. These include the following :
-	// 1. Admin : Onboard new maintainers
-	// 2. Admin : Onboard new projects
-	// 3. Admin : Add Maintainers to projects
-	//
-	// Producer: Alfred (Webhooks)
-	// Consumer: DevPool (GitHub App), Gravemind (workflows)
-	Admin = "admin-bot-stream"
-
 	// The bot command stream is used for participant claiming issues.
 	// These include the following:
 	// 1. Participants : Claiming issues
@@ -78,11 +68,12 @@ const (
 	Leaderboard = "leaderboard-sset"
 	CppRank     = "cpp-ranking-sset"
 	JavaRank    = "java-ranking-sset"
-	PyRank      = "py-ranking-sset"
-	JsRank      = "js-ranking-sset"
+	PyRank      = "python-ranking-sset"
+	JsRank      = "javascript-ranking-sset"
 	GoRank      = "go-ranking-sset"
-	RustRank    = "rs-ranking-sset"
+	RustRank    = "rust-ranking-sset"
 	ZigRank     = "zig-ranking-sset"
 	FlutterRank = "flutter-ranking-sset"
 	KotlinRank  = "kotlin-ranking-sset"
+	HaskellRank = "haskell-ranking-sset"
 )

@@ -45,7 +45,7 @@ func main() {
 	pkg.Log.SetupInfo("[ACTIVE]: Database pool has been created.")
 
 	// Setup valkey client
-	client, err := cmd.SetupValkey()
+	client, err := cmd.InitValkey()
 	if err != nil {
 		return
 	}
