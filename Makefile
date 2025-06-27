@@ -5,5 +5,11 @@ build:
 run: build
 	@./bin/alfred
 
+# For docker users
+docker:
+	@docker compose up -d
+
+# For podman users
 dev:
-	@docker-compose up -d
+	@podman compose down
+	@podman compose up -d

@@ -22,3 +22,12 @@ UPDATE repository
   SET onboarded = true
   WHERE url = $1
 RETURNING name;
+
+-- name: CreateIssueClaimsQuery :one
+
+-- name: RemoveIssueClaimsQuery :one
+
+-- name: CloseIssueQuery :one
+
+
+-- name: ReopenIssueQuery :one

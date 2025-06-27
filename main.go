@@ -82,7 +82,7 @@ func main() {
 	}))
 
 	router.GET("/test", controller.TestEndpointHandler)
-	router.POST("/webhook/:id", controller.WebhookHandler)
+	router.POST("/webhook", controller.WebhookHandler)
 
 	port := strconv.Itoa(cmd.AppConfig.ServerPort)
 	pkg.Log.SetupInfo("[ON]: Server configured and starting on PORT:" + port)
