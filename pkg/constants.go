@@ -13,7 +13,6 @@ const (
 	IssueClaim = "issue-stream"
 
 	// All automatic workflows are managed by this stream. This includes :
-	// 1. Participants : Opening new pull requests
 	// 2. Maintainers : Adding new issues
 	//
 	// Producer: Alfred (Webhooks)
