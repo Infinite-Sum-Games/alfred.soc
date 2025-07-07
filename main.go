@@ -81,8 +81,9 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	router.GET("/test", controller.TestEndpointHandler)
-	router.POST("/webhook", controller.WebhookHandler)
+	router.GET("/api/test", controller.TestEndpointHandler)
+	router.POST("/api/webhook", controller.WebhookHandler)
+	router.POST("/api/webhook/install", controller.InstallationHandler)
 
 	port := strconv.Itoa(cmd.AppConfig.ServerPort)
 	pkg.Log.SetupInfo("[ON]: Server configured and starting on PORT:" + port)
