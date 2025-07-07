@@ -18,7 +18,7 @@ func SetupValkeyStreams(names []string, client *redis.Client) error {
 		// creation.
 		_, err := client.XAdd(ctx, &redis.XAddArgs{
 			Stream: name,
-			Values: map[string]interface{}{"__dummy__": "1"},
+			Values: map[string]any{"__dummy__": "1"},
 		}).Result()
 		if err != nil {
 			return fmt.Errorf("failed to create stream %s: %w", name, err)
