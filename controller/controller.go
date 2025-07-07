@@ -1,15 +1,13 @@
 package controller
 
 import (
-	"context"
+	"bytes"
+	"io"
 	"net/http"
-	"time"
 
-	"github.com/IAmRiteshKoushik/alfred/cmd"
-	"github.com/IAmRiteshKoushik/alfred/db"
 	"github.com/IAmRiteshKoushik/alfred/pkg"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/google/go-github/v62/github"
 )
 
 func TestEndpointHandler(c *gin.Context) {
@@ -20,62 +18,47 @@ func TestEndpointHandler(c *gin.Context) {
 }
 
 func WebhookHandler(c *gin.Context) {
-	id := c.Param("id")
-	repoUUID, err := uuid.Parse(id)
+	payload, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid repository UUID format",
-		})
+		pkg.Log.Error(c, "Error reading request body during webhook event: %v",
+			err,
+		)
+		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	conn, err := cmd.DBPool.Acquire(ctx)
-	defer conn.Release()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to connect to database",
-		})
-		return
-	}
-	queries := db.New()
-
-	// Check repository existance for each webhook event before processing it
-	exists, err := queries.RepositoryExistsQuery(c, conn, repoUUID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Oops! Something happened. Please try again later.",
-		})
-		return
-	}
-	if !exists {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Repository not found",
-		})
-		return
-	}
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(payload))
 
 	// Actuall processing of events
-	event := c.GetHeader("X-GitHub-Event")
-	switch event {
+	eventType := c.GetHeader("X-GitHub-Event")
+	if eventType == "" {
+		pkg.Log.Warn(c, "Missing X-GitHub-Event header")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Missing X-GitHub-Event header",
+		})
+		return
+	}
+	parsedPayload, err := github.ParseWebHook(eventType, payload)
+	if err != nil {
+		pkg.Log.Error(c, "Error parsing request body during webhook event: %v",
+			err,
+		)
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	switch eventType {
 	case "ping":
-		handlePingEvent(c, repoUUID)
+		handlePingEvent(c, parsedPayload)
 	case "issue_comment":
-		handleIssueCommentEvent(c, repoUUID)
+		handleIssueCommentEvent(c, parsedPayload)
 	case "issues":
-		handleIssueEvent(c, repoUUID)
+		handleIssueEvent(c, parsedPayload)
 	case "pull_request":
-		handlePullRequestEvent(c, repoUUID)
+		handlePullRequestEvent(c, parsedPayload)
 	default:
+		pkg.Log.Warn(c, "Failed to process GitHub Event: "+eventType)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Unsupported event type",
 		})
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Webhook event handled successfully",
-	})
-	pkg.Log.Success(c)
 }
