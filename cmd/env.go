@@ -13,12 +13,13 @@ import (
 var AppConfig *EnvConfig
 
 type EnvConfig struct {
-	Environment string
-	ServerHost  string
-	ServerPort  int
-	ValkeyHost  string
-	ValkeyPort  int
-	DatabaseURL string
+	Environment   string
+	ServerHost    string
+	ServerPort    int
+	ValkeyHost    string
+	ValkeyPort    int
+	DatabaseURL   string
+	WebhookSecret string
 }
 
 // isValidHost must satisfy the following interface to be accepted as a
@@ -49,6 +50,7 @@ func (e *EnvConfig) Validate() error {
 		v.Field(&e.ValkeyHost, v.Required, v.By(isValidHost)),
 		v.Field(&e.ValkeyPort, v.Required, v.Min(1), v.Max(65535)),
 		v.Field(&e.DatabaseURL, v.Required, is.URL),
+		v.Field(&e.WebhookSecret, v.Required),
 	)
 }
 
@@ -66,12 +68,13 @@ func SetupEnv() error {
 	}
 
 	AppConfig = &EnvConfig{
-		Environment: viper.GetString("server.environment"),
-		ServerHost:  viper.GetString("server.host"),
-		ServerPort:  viper.GetInt("server.port"),
-		ValkeyHost:  viper.GetString("valkey.host"),
-		ValkeyPort:  viper.GetInt("valkey.port"),
-		DatabaseURL: viper.GetString("database.url"),
+		Environment:   viper.GetString("server.environment"),
+		ServerHost:    viper.GetString("server.host"),
+		ServerPort:    viper.GetInt("server.port"),
+		ValkeyHost:    viper.GetString("valkey.host"),
+		ValkeyPort:    viper.GetInt("valkey.port"),
+		DatabaseURL:   viper.GetString("database.url"),
+		WebhookSecret: viper.GetString("github.webhook_secret"),
 	}
 	if err := AppConfig.Validate(); err != nil {
 		return err
