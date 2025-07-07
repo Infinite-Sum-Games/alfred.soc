@@ -46,3 +46,17 @@ func CloseValkey(client *redis.Client) {
 		client.Close()
 	}
 }
+
+func AddToStream(client *redis.Client, key string, value string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := client.XAdd(ctx, &redis.XAddArgs{
+		Stream: key,
+		Values: map[string]string{"data": value},
+	}).Result()
+	if err != nil {
+		return fmt.Errorf("Failed to add to stream: %v", value)
+	}
+	return nil
+}
