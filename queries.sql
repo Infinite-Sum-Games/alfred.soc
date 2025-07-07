@@ -97,3 +97,25 @@ WHERE
     AND issue_url = $3
     AND elapsed_on > NOW()
 returning ghUsername;
+
+-- name: AddSolutionQuery :one
+INSERT INTO solutions (url, repo_url, ghUsername)
+VALUES ($1, $2, $3)
+RETURNING url;
+
+-- name: MergeSolutionQuery :one
+UPDATE solutions
+SET
+    is_merged = true,
+    updated_at = NOW()
+WHERE
+    url = $1
+RETURNING url;
+
+-- name: CheckIfSolutionExist :one
+SELECT
+    id
+FROM
+    solutions
+WHERE
+    url = $1;
