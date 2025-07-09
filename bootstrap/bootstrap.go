@@ -78,7 +78,7 @@ func BootstrapValkey() bool {
 	var missingStreams []string
 	for name, exists := range existStreams {
 		if !exists {
-			pkg.Log.SetupInfo(
+			pkg.Log.SetupWarn(
 				fmt.Sprintf("[ISSUE]: Missing stream %s. Attempting to create.", name),
 			)
 			missingStreams = append(missingStreams, name)
@@ -103,7 +103,7 @@ func BootstrapValkey() bool {
 	var missingHashes []string
 	for name, exists := range existHashes {
 		if !exists {
-			pkg.Log.SetupInfo(
+			pkg.Log.SetupWarn(
 				fmt.Sprintf("[ISSUE]: Missing hash-set %s. Attempting to create.", name),
 			)
 			missingHashes = append(missingHashes, name)
@@ -128,7 +128,7 @@ func BootstrapValkey() bool {
 	var missingZSets []string
 	for name, exists := range existZSets {
 		if !exists {
-			pkg.Log.SetupInfo(
+			pkg.Log.SetupWarn(
 				fmt.Sprintf("[ISSUE]: Missing sorted-set %s. Attempting to create.", name),
 			)
 			missingZSets = append(missingZSets, name)
