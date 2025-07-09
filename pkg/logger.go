@@ -52,6 +52,11 @@ func NewLoggerService(env string, file *os.File) *LoggerService {
 func (l *LoggerService) SetupInfo(msg string) {
 	l.log.WithLevel(zerolog.InfoLevel).Msg(msg)
 }
+
+func (l *LoggerService) SetupWarn(msg string) {
+	l.log.WithLevel(zerolog.WarnLevel).Msg(msg)
+}
+
 func (l *LoggerService) SetupFail(msg string, err error) {
 	l.log.WithLevel(zerolog.ErrorLevel).Err(err).Msg(msg)
 }
