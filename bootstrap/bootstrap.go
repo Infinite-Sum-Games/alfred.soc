@@ -27,6 +27,7 @@ var Structures = []StructureInfo{
 	{Name: pkg.FeatSet, Type: "hash"},
 	{Name: pkg.DocSet, Type: "hash"},
 	{Name: pkg.EnamouredSet, Type: "hash"},
+	{Name: pkg.RepoTokenSet, Type: "hash"},
 
 	// SortedSets
 	{Name: pkg.Leaderboard, Type: "zset"},

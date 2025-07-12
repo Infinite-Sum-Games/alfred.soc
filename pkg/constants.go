@@ -59,6 +59,8 @@ const (
 	// This hashset behaves slightly differently. Here, there is an
 	// eviction policy so as to maintain the streak
 	EnamouredSet = "enamoured-set"
+	// Thhis set is added for keeping track of RepoURLs and their instal tokens
+	RepoTokenSet = "repo-token-set"
 )
 
 // SortedSets to handle leaderboard, language badges and
