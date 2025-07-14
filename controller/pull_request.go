@@ -13,9 +13,10 @@ import (
 	"github.com/google/go-github/v62/github"
 )
 
-type MergeSolution struct {
+type Solution struct {
 	Username string `json:"github_username"`
 	Url      string `json:"pull_request_url"`
+	Merged   bool   `json:"merged"`
 }
 
 func handlePullRequestEvent(c *gin.Context, payload any) {
@@ -57,9 +58,32 @@ func handlePullRequestEvent(c *gin.Context, payload any) {
 			Ghusername: username,
 		})
 		if err != nil {
+			pkg.Log.Fatal(c, "Could not add solution to database", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		// Marshal data to send to redis
+		jsonData, err := json.Marshal(Solution{
+			Username: username,
+			Url:      prUrl,
+			Merged:   false,
+		})
+		if err != nil {
+			pkg.Log.Error(c, "Failed to marshal payload", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		// Update redis for further processing of achievements
+		err = cmd.AddToStream(pkg.Valkey, pkg.SolutionMerge, string(jsonData))
+		if err != nil {
+			pkg.Log.Error(c, "Failed to insert into Redis", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
 	}
+
 	if isMerged {
 		ok, err := q.CheckIfSolutionExist(ctx, tx, prUrl)
 		if err != nil {
@@ -85,16 +109,19 @@ func handlePullRequestEvent(c *gin.Context, payload any) {
 			return
 		}
 
-		// Update redis for further processing of achievements
-		jsonData, err := json.Marshal(MergeSolution{
+		// Marshal data to send to redis
+		jsonData, err := json.Marshal(Solution{
 			Username: username,
 			Url:      prUrl,
+			Merged:   true,
 		})
 		if err != nil {
 			pkg.Log.Error(c, "Failed to marshal payload", err)
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
+
+		// Update redis for further processing of achievements
 		err = cmd.AddToStream(pkg.Valkey, pkg.SolutionMerge, string(jsonData))
 		if err != nil {
 			pkg.Log.Error(c, "Failed to insert into Redis", err)
@@ -103,6 +130,7 @@ func handlePullRequestEvent(c *gin.Context, payload any) {
 		}
 	}
 
+	// Common transaction manager closing statement for both isOpen and isMerged
 	if err := tx.Commit(ctx); err != nil {
 		pkg.Log.Fatal(c, "Could not commit transaction", err)
 		c.AbortWithStatus(http.StatusInternalServerError)
