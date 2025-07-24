@@ -234,7 +234,7 @@ func issueUserAction(c *gin.Context, username string, url string, action string)
 			IssueUrl:   url,
 			Ghusername: username,
 			ClaimedOn:  pgtype.Timestamp{Time: time.Now(), Valid: true},
-			ElapsedOn:  pgtype.Timestamp{Time: time.Now(), Valid: true},
+			ElapsedOn:  pgtype.Timestamp{Time: time.Now().Add(7 * 24 * time.Hour), Valid: true},
 		}
 		err = q.IssueAssignQuery(ctx, tx, params)
 		if err != nil {
