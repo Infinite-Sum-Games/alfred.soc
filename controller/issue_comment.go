@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -53,26 +54,22 @@ func findCommentator(username string, repoUrl string) (Commentator, error) {
 	defer conn.Release()
 
 	q := db.New()
-	ok, err := q.CheckForMaintainerQuery(ctx, conn, db.CheckForMaintainerQueryParams{
-		Maintainers: []string{username},
-		Url:         repoUrl,
-	})
+	maintainers, err := q.GetMaintainersQuery(ctx, conn, repoUrl)
 	if err != nil {
 		return Commentator(UnknownUser), err
 	}
+
+	ok := slices.Contains(maintainers, username)
 	if ok {
-		return Commentator(Maintainer), nil
+		return Commentator(Maintainer), err
 	}
 
 	ok, err = q.ParticipantExistsQuery(ctx, conn, username)
 	if err != nil {
 		return Commentator(UnknownUser), err
 	}
-	if ok {
-		return Commentator(Participant), nil
-	}
 
-	return Commentator(UnknownUser), nil
+	return Commentator(Participant), nil
 }
 
 // Claims and unclaims
@@ -100,17 +97,13 @@ func marshalUnassign(username string, issueUrl string) IssueAction {
 	}
 }
 
-func handleExtension(username string, days int, issueUrl string) IssueAction {
+func handleExtension(username string, days int, issueUrl string) (IssueAction, error) {
+	fmt.Println(username, days, issueUrl)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	tx, err := cmd.DBPool.Begin(ctx)
 	if err != nil {
-		return IssueAction{
-			ParticipantUsername: username,
-			Url:                 issueUrl,
-			Claimed:             true,
-			Extend:              false,
-		}
+		return IssueAction{}, err
 	}
 	defer tx.Rollback(ctx)
 
@@ -121,29 +114,19 @@ func handleExtension(username string, days int, issueUrl string) IssueAction {
 		Days:       int32(days),
 	})
 	if err != nil || ok == "" {
-		return IssueAction{
-			ParticipantUsername: username,
-			Url:                 issueUrl,
-			Claimed:             true,
-			Extend:              false,
-		}
+		return IssueAction{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return IssueAction{
-			ParticipantUsername: username,
-			Url:                 issueUrl,
-			Claimed:             true,
-			Extend:              false,
-		}
+		return IssueAction{}, err
 	}
 
 	return IssueAction{
 		ParticipantUsername: username,
 		Url:                 issueUrl,
-		Claimed:             true,
+		Claimed:             false,
 		Extend:              true,
-	}
+	}, err
 }
 
 // Bounties and penalties
@@ -188,26 +171,20 @@ type AllowedComment struct {
 func parseComment(cm string, by Commentator, username string,
 	url string) (Comment, AllowedComment, error) {
 
-	cm = strings.Trim(cm, " ")
-	if by == Commentator(Participant) {
-		switch {
-
-		case cm == "/assign":
+	cm = strings.TrimSpace(cm)
+	if by == Participant {
+		if strings.HasPrefix(cm, "/assign") {
 			data := marshalAssign(username, url)
 			return Comment(Assign), AllowedComment{i: data}, nil
-
-		case cm == "/unassign":
+		} else if strings.HasPrefix(cm, "/unassign") {
 			data := marshalUnassign(username, url)
 			return Comment(Unassign), AllowedComment{i: data}, nil
-
-		default:
+		} else {
 			return Comment(NoAction), AllowedComment{}, nil
 		}
 
-	} else if by == Commentator(Maintainer) {
-		switch {
-
-		case strings.HasPrefix(cm, "/bounty"):
+	} else if by == Maintainer {
+		if strings.HasPrefix(cm, "/bounty") {
 			comment := strings.Split(cm, " ")
 			if len(comment) != 3 {
 				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
@@ -218,8 +195,7 @@ func parseComment(cm string, by Commentator, username string,
 			}
 			data := marshalAmt(comment[2], amt, "bounty", url)
 			return Comment(BountyComment), AllowedComment{b: data}, nil
-
-		case strings.HasPrefix(cm, "/penalty"):
+		} else if strings.HasPrefix(cm, "/penalty") {
 			comment := strings.Split(cm, " ")
 			if len(comment) != 3 {
 				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
@@ -230,40 +206,35 @@ func parseComment(cm string, by Commentator, username string,
 			}
 			data := marshalAmt(comment[2], amt, "penalty", url)
 			return Comment(PenaltyComment), AllowedComment{b: data}, nil
-
-		case strings.HasPrefix(cm, "/help"):
+		} else if strings.HasPrefix(cm, "/help") {
 			comment := strings.Split(cm, " ")
 			if len(comment) != 2 {
 				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
 			}
 			data := marshalAchievement(comment[1], "help", url)
 			return Comment(HelpComment), AllowedComment{a: data}, nil
-
-		case strings.HasPrefix(cm, "/doc"):
+		} else if strings.HasPrefix(cm, "/doc") {
 			comment := strings.Split(cm, " ")
 			if len(comment) != 2 {
 				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
 			}
-			data := marshalAchievement(comment[1], "help", url)
+			data := marshalAchievement(comment[1], "doc", url)
 			return Comment(DocComment), AllowedComment{a: data}, nil
-
-		case strings.HasPrefix(cm, "/test"):
+		} else if strings.HasPrefix(cm, "/test") {
 			comment := strings.Split(cm, " ")
 			if len(comment) != 2 {
 				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
 			}
 			data := marshalAchievement(comment[1], "test", url)
 			return Comment(TestComment), AllowedComment{a: data}, nil
-
-		case strings.HasPrefix(cm, "/impact"):
+		} else if strings.HasPrefix(cm, "/impact") {
 			comment := strings.Split(cm, " ")
 			if len(comment) != 2 {
 				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
 			}
 			data := marshalAchievement(comment[1], "impact", url)
 			return Comment(ImpactComment), AllowedComment{a: data}, nil
-
-		case strings.HasPrefix(cm, "/extend"):
+		} else if strings.HasPrefix(cm, "/extend") {
 			comment := strings.Split(cm, " ")
 			if len(comment) != 3 {
 				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
@@ -272,22 +243,22 @@ func parseComment(cm string, by Commentator, username string,
 			if err != nil {
 				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
 			}
-			data := handleExtension(comment[2], days, url)
+			data, err := handleExtension(comment[2][1:], days, url)
+			if err != nil {
+				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Failed to grant extension: %w", err)
+			}
 			return Comment(Extend), AllowedComment{i: data}, nil
-
-		case strings.HasPrefix(cm, "/bug"):
+		} else if strings.HasPrefix(cm, "/bug") {
 			comment := strings.Split(cm, " ")
 			if len(comment) != 2 {
 				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
 			}
 			data := marshalAchievement(username, "bug", url)
 			return Comment(BugReport), AllowedComment{a: data}, nil
-
-		default:
+		} else {
 			return Comment(NoAction), AllowedComment{}, nil
 		}
 	}
-
 	// Neither maintainer nor participant, do not process
 	return Comment(NoAction), AllowedComment{}, nil
 }
@@ -297,7 +268,7 @@ func parseComment(cm string, by Commentator, username string,
 func handleIssueCommentEvent(c *gin.Context, payload any) {
 	issueCommentEvent, ok := payload.(*github.IssueCommentEvent)
 	if !ok {
-		pkg.Log.Error(c, "Failed to parse Issue-Event",
+		pkg.Log.Error(c, "Failed to marshal issue-comment event",
 			fmt.Errorf("Malformed event payload received in Issue-Event"),
 		)
 		c.AbortWithStatus(http.StatusBadRequest)
@@ -309,6 +280,7 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 	commentBy := *issueCommentEvent.Comment.User.Login
 	commentator, err := findCommentator(commentBy, repoUrl)
 	if err != nil {
+		pkg.Log.Error(c, "Failed to find the commentator", err)
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
@@ -316,13 +288,14 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 	commentBody := *issueCommentEvent.Comment.Body
 	action, result, err := parseComment(commentBody, commentator, commentBy, issueUrl)
 	if err != nil {
-		pkg.Log.Error(c, "Failed to parse comment", err)
+		pkg.Log.Error(c, "Failed to parse issue-comment", err)
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
 	// No action
 	if action == NoAction {
+		pkg.Log.Info(c, "No action is being performed for issue comment")
 		c.AbortWithStatus(http.StatusOK)
 		return
 
@@ -404,7 +377,7 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Event handled successfully",
+		"message": "Issue-Comment Event handled successfully",
 	})
 	pkg.Log.Success(c)
 }

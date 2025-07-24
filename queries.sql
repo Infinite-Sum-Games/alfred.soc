@@ -5,12 +5,9 @@ SELECT EXISTS (
   AND status = true
 ) AS found;
 
--- name: CheckForMaintainerQuery :one
-SELECT EXISTS (
-  SELECT 1 FROM repository
-  WHERE url = $1
-    AND $2 = ANY(maintainers)
-) AS is_maintainer;
+-- name: GetMaintainersQuery :one
+SELECT maintainers FROM repository
+WHERE url = $1;
 
 -- name: VerifyRepositoryQuery :one
 UPDATE repository 
