@@ -99,12 +99,14 @@ func InstallationHandler(c *gin.Context) {
 	for _, repo := range installationEvent.Repositories {
 		repoURL := *repo.HTMLURL
 
-		_, err := q.VerifyRepository(ctx, tx, db.VerifyRepositoryParams{
+		_, err := q.VerifyRepositoryQuery(ctx, tx, db.VerifyRepositoryQueryParams{
 			InstallationID: pgtype.Int8{Int64: installationId, Valid: true},
 			Url:            repoURL,
 		})
 		if err != nil {
 			pkg.Log.Error(c, "Failed to verify repository: "+repoURL, err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
 		}
 	}
 

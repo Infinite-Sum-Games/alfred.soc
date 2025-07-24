@@ -12,7 +12,7 @@ SELECT EXISTS (
     AND $2 = ANY(maintainers)
 ) AS is_maintainer;
 
--- name: VerifyRepository :one
+-- name: VerifyRepositoryQuery :one
 UPDATE repository 
   SET installation_id = $1
   WHERE url = $2
