@@ -25,8 +25,8 @@ SELECT EXISTS(
 ) AS found;
 
 -- name: AddNewIssueQuery :exec
-INSERT INTO issues (id, title, repoUrl, url)
-VALUES ($1, $2, $3, $4);
+INSERT INTO issues (title, repoUrl, url)
+VALUES ($1, $2, $3);
 
 -- name: UpdateIssueDifficultyQuery :one
 UPDATE issues
@@ -48,7 +48,6 @@ UPDATE issues
 SET tags = array_append(tags, $1),
     updated_at = NOW()
 WHERE url = $2
-AND NOT tags @> ARRAY[$1]::text[]
 RETURNING tags;
 
 -- name: IssueAssignQuery :exec

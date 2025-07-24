@@ -79,9 +79,9 @@ CREATE TABLE IF NOT EXISTS issues(
   updated_at TIMESTAMP DEFAULT NOW(),
 
   CONSTRAINT "issues_pkey" PRIMARY KEY (id),
-  CONSTRAINT "issues_repoid_fkey"
-    FOREIGN KEY (repoId)
-      REFERENCES repository(id)
+  CONSTRAINT "issues_repourl_fkey"
+    FOREIGN KEY (repoUrl)
+      REFERENCES repository(url)
         ON DELETE RESTRICT
         ON UPDATE CASCADE
 );
@@ -115,9 +115,9 @@ CREATE TABLE IF NOT EXISTS solutions(
   updated_at TIMESTAMP DEFAULT NOW(),
 
   CONSTRAINT "solutions_pkey" PRIMARY KEY (id),
-  CONSTRAINT "solutions_repo_id_fkey" 
-    FOREIGN KEY (repo_id)
-      REFERENCES repository(id)
+  CONSTRAINT "solutions_repo_url_fkey" 
+    FOREIGN KEY (repo_url)
+      REFERENCES repository(url)
         ON DELETE RESTRICT
         ON UPDATE CASCADE,
   CONSTRAINT "solutions_ghUsername_fkey"
@@ -134,7 +134,6 @@ CREATE TABLE IF NOT EXISTS bounty_log(
   ghUsername TEXT NOT NULL,
   dispatched_by TEXT NOT NULL,
   proof_url TEXT NOT NULL,
-  repo_id UUID NOT NULL,
   amount INTEGER NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
 
@@ -147,11 +146,6 @@ CREATE TABLE IF NOT EXISTS bounty_log(
   CONSTRAINT "bounty_log_ghUsername_fkey"
     FOREIGN KEY (ghUsername)
       REFERENCES user_account(ghUsername)
-        ON DELETE RESTRICT
-        ON UPDATE CASCADE,
-  CONSTRAINT "bounty_log_repo_id_fkey"
-    FOREIGN KEY (repo_id)
-      REFERENCES repository(id)
         ON DELETE RESTRICT
         ON UPDATE CASCADE
 );

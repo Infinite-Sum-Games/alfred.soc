@@ -7,7 +7,7 @@ import (
 
 	"github.com/IAmRiteshKoushik/alfred/pkg"
 	"github.com/gin-gonic/gin"
-	"github.com/google/go-github/v62/github"
+	"github.com/google/go-github/v74/github"
 )
 
 func TestEndpointHandler(c *gin.Context) {
@@ -45,6 +45,7 @@ func WebhookHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
+
 	switch eventType {
 	case "ping":
 		handlePingEvent(c, parsedPayload)

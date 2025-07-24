@@ -12,15 +12,14 @@ import (
 	"github.com/IAmRiteshKoushik/alfred/db"
 	"github.com/IAmRiteshKoushik/alfred/pkg"
 	"github.com/gin-gonic/gin"
-	"github.com/google/go-github/v62/github"
-	"github.com/google/uuid"
+	"github.com/google/go-github/v74/github"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func handleIssueEvent(c *gin.Context, payload any) {
-	// Only [ labelled, assigned, unassigned, closed, reopened ] to be handled
+	// Only [ labeled, assigned, unassigned, closed, reopened ] to be handled
 
-	issueEvent, ok := payload.(*github.IssueEvent)
+	issueEvent, ok := payload.(*github.IssuesEvent)
 	if !ok {
 		pkg.Log.Error(c, "Failed to parse Issue-Event",
 			fmt.Errorf("Malformed event payload received in Issue-Event"),
@@ -30,16 +29,16 @@ func handleIssueEvent(c *gin.Context, payload any) {
 	}
 
 	username := *issueEvent.Issue.User.Login
-	issueUrl := *issueEvent.URL
-	event := *issueEvent.Event
+	issueUrl := *issueEvent.Issue.HTMLURL
+	event := *issueEvent.Action
 
 	switch event {
-	case "labelled":
+	case "labeled":
 		label := strings.ToLower(*issueEvent.Label.Name)
 		if label == "amsoc-accepted" {
 			title := *issueEvent.Issue.Title
-			repoUrl := *issueEvent.Repository.HTMLURL
-			issueAccepted(c, title, issueUrl, repoUrl)
+			repoUrl := *issueEvent.Repo.HTMLURL
+			issueAccepted(c, title, repoUrl, issueUrl)
 			return
 		}
 		if slices.Contains([]string{"easy", "medium", "hard"}, label) {
@@ -58,7 +57,7 @@ func handleIssueEvent(c *gin.Context, payload any) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "This issue event-type" + event + " is not handled.",
 		})
-		pkg.Log.Warn(c, event+"is not handled.")
+		pkg.Log.Warn(c, event+" is not handled.")
 		return
 	}
 }
@@ -97,7 +96,6 @@ func issueAccepted(c *gin.Context, title, repoUrl string, url string) {
 	}
 
 	params := db.AddNewIssueQueryParams{
-		ID:      uuid.New(),
 		Title:   title,
 		Repourl: repoUrl,
 		Url:     url,
@@ -146,7 +144,7 @@ func updateIssueDifficulty(c *gin.Context, issueUrl string, difficulty string) {
 		Url:        issueUrl,
 	}
 	result, err := q.UpdateIssueDifficultyQuery(ctx, tx, params)
-	if err != nil || len(result) != 1 {
+	if err != nil || len(result) == 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Failed to update issue difficulty",
 		})
@@ -186,7 +184,7 @@ func issueTagUpdate(c *gin.Context, issueUrl string, tag string) {
 	q := db.New()
 
 	params := db.AddIssueTagQueryParams{
-		ArrayAppend: []string{tag},
+		ArrayAppend: tag,
 		Url:         issueUrl,
 	}
 

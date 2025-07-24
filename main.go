@@ -71,6 +71,7 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.Default()
+	router.Use(pkg.TagRequestWithId)
 	router.Use(middleware.PanicRecovery)
 	router.Use(gin.Logger())
 	router.Use(cors.New(cors.Config{

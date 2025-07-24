@@ -13,7 +13,7 @@ import (
 	"github.com/IAmRiteshKoushik/alfred/db"
 	"github.com/IAmRiteshKoushik/alfred/pkg"
 	"github.com/gin-gonic/gin"
-	"github.com/google/go-github/v62/github"
+	"github.com/google/go-github/v74/github"
 )
 
 type Commentator int
