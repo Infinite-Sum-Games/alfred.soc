@@ -19,7 +19,7 @@ func InitDB() (*pgxpool.Pool, error) {
 	}
 
 	config.MinConns = 1
-	config.MaxConns = 5
+	config.MaxConns = 10
 	config.MaxConnLifetime = 3600
 	config.MaxConnIdleTime = 1800
 	config.HealthCheckPeriod = 60
