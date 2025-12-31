@@ -12,7 +12,7 @@ WHERE url = $1;
 -- name: VerifyRepositoryQuery :one
 UPDATE repository 
   SET linked = TRUE
-  WHERE url = $2
+  WHERE url = $1
 RETURNING name;
 
 -- name: CheckOpenIssueQuery :one
