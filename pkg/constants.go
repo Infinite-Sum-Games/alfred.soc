@@ -30,7 +30,7 @@ const (
 	// running further workflows on badge distribution.
 	//
 	// Producer: Alfred (Webhooks)
-	// Consumer: DevPool (GitHub App), Gravemind (Workflows)
+	// Consumer: Gravemind (Workflows)
 	SolutionMerge = "solution-merged-stream"
 
 	// The live-update-stream is used to supply events to the SSE endpoint on
@@ -57,10 +57,8 @@ const (
 	FeatSet     = "feature-suggestion-set"
 
 	// This hashset behaves slightly differently. Here, there is an
-	// eviction policy so as to maintain the streak
-	EnamouredSet = "enamoured-set"
-	// Thhis set is added for keeping track of RepoURLs and their instal tokens
-	RepoTokenSet = "repo-token-set"
+	// eviction policy so as to maintain the streak. Not being used currently
+	// EnamouredSet = "enamoured-set"
 )
 
 // SortedSets to handle leaderboard, language badges and
@@ -73,7 +71,7 @@ const (
 	JsRank      = "javascript-ranking-sset"
 	GoRank      = "go-ranking-sset"
 	RustRank    = "rust-ranking-sset"
-	ZigRank     = "zig-ranking-sset"
+	// ZigRank     = "zig-ranking-sset"
 	FlutterRank = "flutter-ranking-sset"
 	KotlinRank  = "kotlin-ranking-sset"
 	HaskellRank = "haskell-ranking-sset"
