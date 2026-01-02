@@ -155,6 +155,18 @@ func (q *Queries) CloseIssueQuery(ctx context.Context, db DBTX, url string) (str
 	return url, err
 }
 
+const deleteSolutionQuery = `-- name: DeleteSolutionQuery :one
+DELETE FROM solutions
+WHERE url = $1
+RETURNING url
+`
+
+func (q *Queries) DeleteSolutionQuery(ctx context.Context, db DBTX, url string) (string, error) {
+	row := db.QueryRow(ctx, deleteSolutionQuery, url)
+	err := row.Scan(&url)
+	return url, err
+}
+
 const extendClaimQuery = `-- name: ExtendClaimQuery :one
 UPDATE issue_claims
 SET

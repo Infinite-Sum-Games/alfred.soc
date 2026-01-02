@@ -99,6 +99,11 @@ INSERT INTO solutions (url, repo_url, ghUsername)
 VALUES ($1, $2, $3)
 RETURNING url;
 
+-- name: DeleteSolutionQuery :one
+DELETE FROM solutions
+WHERE url = $1
+RETURNING url;
+
 -- name: MergeSolutionQuery :one
 UPDATE solutions
 SET
