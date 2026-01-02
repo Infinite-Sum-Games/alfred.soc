@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/IAmRiteshKoushik/alfred/cmd"
-	"github.com/IAmRiteshKoushik/alfred/db"
+	db "github.com/IAmRiteshKoushik/alfred/db/gen"
 	"github.com/IAmRiteshKoushik/alfred/pkg"
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/v74/github"
@@ -17,7 +18,7 @@ import (
 )
 
 func handleIssueEvent(c *gin.Context, payload any) {
-	// Only [ labeled, assigned, unassigned, closed, reopened ] to be handled
+	// Only "labeled, assigned, unassigned, closed, reopened" to be handled
 
 	issueEvent, ok := payload.(*github.IssuesEvent)
 	if !ok {
@@ -28,31 +29,43 @@ func handleIssueEvent(c *gin.Context, payload any) {
 		return
 	}
 
-	username := *issueEvent.Issue.User.Login
-	issueUrl := *issueEvent.Issue.HTMLURL
 	event := *issueEvent.Action
 
 	switch event {
 	case "labeled":
-		label := strings.ToLower(*issueEvent.Label.Name)
-		if label == "amsoc-accepted" {
+		label := strings.ToUpper(*issueEvent.Label.Name)
+		if label == "AMSOC-ACCEPTED" {
 			title := *issueEvent.Issue.Title
 			repoUrl := *issueEvent.Repo.HTMLURL
-			issueAccepted(c, title, repoUrl, issueUrl)
+			issueAccepted(c, title, repoUrl, *issueEvent.Issue.HTMLURL)
 			return
 		}
-		if slices.Contains([]string{"easy", "medium", "hard"}, label) {
-			updateIssueDifficulty(c, issueUrl, label)
+		if slices.Contains([]string{"EASY", "MEDIUM", "HARD"}, label) {
+			updateIssueDifficulty(c, *issueEvent.Issue.HTMLURL, label)
 			return
 		}
-		issueTagUpdate(c, issueUrl, label)
+		if strings.HasPrefix(label, "BOUNTY-") {
+			updateIssueBounty(c, *issueEvent.Issue.HTMLURL, label)
+			return
+		}
+		issueTagUpdate(c, *issueEvent.Issue.HTMLURL, label)
 		return
+
 	case "assigned", "unassigned":
+		if issueEvent.Assignee == nil {
+			pkg.Log.Warn(c, "Assignee is nil, skipping issue user action")
+			c.JSON(http.StatusOK, gin.H{"message": "Assignee is nil, skipping action"})
+			return
+		}
+		username := *issueEvent.Assignee.Login
+		issueUrl := *issueEvent.Issue.HTMLURL
 		issueUserAction(c, username, issueUrl, event)
 		return
+
 	case "closed", "reopened":
-		issueStateChangeAction(c, issueUrl, event)
+		issueStateChangeAction(c, *issueEvent.Issue.HTMLURL, event)
 		return
+
 	default:
 		c.JSON(http.StatusOK, gin.H{
 			"message": "This issue event-type" + event + " is not handled.",
@@ -140,7 +153,7 @@ func updateIssueDifficulty(c *gin.Context, issueUrl string, difficulty string) {
 
 	q := db.New()
 	params := db.UpdateIssueDifficultyQueryParams{
-		Difficulty: pgtype.Text{String: strings.ToTitle(difficulty), Valid: true},
+		Difficulty: difficulty,
 		Url:        issueUrl,
 	}
 	result, err := q.UpdateIssueDifficultyQuery(ctx, tx, params)
@@ -212,6 +225,57 @@ func issueTagUpdate(c *gin.Context, issueUrl string, tag string) {
 	})
 }
 
+func updateIssueBounty(c *gin.Context, issueUrl string, bounty string) {
+	bountyVal, err := strconv.Atoi(strings.TrimPrefix(bounty, "BOUNTY-"))
+	if err != nil {
+		pkg.Log.Error(c, "Failed to parse bounty value", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid bounty value",
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tx, err := cmd.DBPool.Begin(ctx)
+	if err != nil {
+		pkg.Log.Error(c, "Failed to begin transaction", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to check issue status",
+		})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	q := db.New()
+	params := db.UpdateIssueBountyQueryParams{
+		BountyPromised: int32(bountyVal),
+		Url:            issueUrl,
+	}
+	result, err := q.UpdateIssueBountyQuery(ctx, tx, params)
+	if err != nil || len(result) == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to update issue bounty",
+		})
+		pkg.Log.Error(c, "Failed to update issue bounty", err)
+		return
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to commit transaction",
+		})
+		pkg.Log.Fatal(c, "Failed to commit transaction", err)
+		return
+	}
+
+	pkg.Log.Info(c, "Successfully updated issue bounty")
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Issue bounty updated successfully",
+	})
+}
+
 func issueUserAction(c *gin.Context, username string, url string, action string) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -228,13 +292,25 @@ func issueUserAction(c *gin.Context, username string, url string, action string)
 
 	q := db.New()
 
+	exists, err := q.ParticipantExistsQuery(ctx, tx, pgtype.Text{String: username, Valid: true})
+	if err != nil {
+		pkg.Log.Error(c, "Failed to check participant existence", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to check participant existence"})
+		return
+	}
+	if !exists {
+		pkg.Log.Warn(c, "Participant not found")
+		c.JSON(http.StatusNotFound, gin.H{"message": "Participant not found"})
+		return
+	}
+
 	switch action {
 	case "assigned":
 		params := db.IssueAssignQueryParams{
 			IssueUrl:   url,
 			Ghusername: username,
 			ClaimedOn:  pgtype.Timestamp{Time: time.Now(), Valid: true},
-			ElapsedOn:  pgtype.Timestamp{Time: time.Now().Add(7 * 24 * time.Hour), Valid: true},
+			ElapsedOn:  pgtype.Timestamp{Time: time.Now().Add(8 * 24 * time.Hour), Valid: true},
 		}
 		err = q.IssueAssignQuery(ctx, tx, params)
 		if err != nil {
@@ -249,9 +325,14 @@ func issueUserAction(c *gin.Context, username string, url string, action string)
 			Ghusername: username,
 		}
 		ok, err := q.IssueUnassignQuery(ctx, tx, params)
-		if err != nil || ok == "" {
+		if err != nil {
 			pkg.Log.Error(c, "Failed to unassign issue", err)
 			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		if ok == "" {
+			pkg.Log.Warn(c, "Issue not found or user not assigned")
+			c.AbortWithStatus(http.StatusNotFound)
 			return
 		}
 
@@ -285,9 +366,11 @@ func issueUserAction(c *gin.Context, username string, url string, action string)
 	})
 }
 
+// Issue: CLOSED, REOPENED
 func issueStateChangeAction(c *gin.Context, url string, state string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	tx, err := cmd.DBPool.Begin(ctx)
 	if err != nil {
 		pkg.Log.Error(c, "Failed to begin transaction", err)
@@ -297,6 +380,7 @@ func issueStateChangeAction(c *gin.Context, url string, state string) {
 		return
 	}
 	defer tx.Rollback(ctx)
+
 	q := db.New()
 
 	switch state {
