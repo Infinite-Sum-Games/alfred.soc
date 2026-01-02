@@ -165,7 +165,7 @@ func marshalAchievement(username string, action string, url string) Achievement 
 	}
 }
 
-func processBountyOrPenalty(c *gin.Context, bountyData BountyAction, dispatchedBy string) error {
+func processBountyOrPenalty(bountyData BountyAction, dispatchedBy string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -352,7 +352,7 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 
 		// bounties and penalties
 	} else if action == BountyComment || action == PenaltyComment {
-		err := processBountyOrPenalty(c, result.b, commentBy)
+		err := processBountyOrPenalty(result.b, commentBy)
 		if err != nil {
 			pkg.Log.Error(c, "Failed to process bounty/penalty", err)
 			c.AbortWithStatus(http.StatusInternalServerError)
