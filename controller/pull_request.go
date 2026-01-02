@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/IAmRiteshKoushik/alfred/cmd"
-	"github.com/IAmRiteshKoushik/alfred/db"
+	db "github.com/IAmRiteshKoushik/alfred/db/gen"
 	"github.com/IAmRiteshKoushik/alfred/pkg"
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/v74/github"
