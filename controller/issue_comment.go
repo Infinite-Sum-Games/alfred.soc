@@ -182,7 +182,7 @@ func processBountyOrPenalty(c *gin.Context, bountyData BountyAction, dispatchedB
 		amount = -amount
 	}
 
-	updatedBounty, err := q.UpdateUserBountyQuery(ctx, tx, db.UpdateUserBountyQueryParams{
+	_, err = q.UpdateUserBountyQuery(ctx, tx, db.UpdateUserBountyQueryParams{
 		Bounty:     amount,
 		Ghusername: pgtype.Text{String: bountyData.ParticipantUsername, Valid: true},
 	})
