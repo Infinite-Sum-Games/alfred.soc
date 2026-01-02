@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/IAmRiteshKoushik/alfred/cmd"
-	"github.com/IAmRiteshKoushik/alfred/db"
+	db "github.com/IAmRiteshKoushik/alfred/db/gen"
 	"github.com/IAmRiteshKoushik/alfred/pkg"
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/v74/github"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Commentator int
@@ -64,7 +65,10 @@ func findCommentator(username string, repoUrl string) (Commentator, error) {
 		return Commentator(Maintainer), err
 	}
 
-	ok, err = q.ParticipantExistsQuery(ctx, conn, username)
+	ok, err = q.ParticipantExistsQuery(ctx, conn, pgtype.Text{
+		String: username,
+		Valid:  true,
+	})
 	if err != nil {
 		return Commentator(UnknownUser), err
 	}
@@ -159,6 +163,53 @@ func marshalAchievement(username string, action string, url string) Achievement 
 		Type:                action,
 		Url:                 url,
 	}
+}
+
+func processBountyOrPenalty(c *gin.Context, bountyData BountyAction, dispatchedBy string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tx, err := cmd.DBPool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	q := db.New()
+
+	amount := int32(bountyData.Amount)
+	if bountyData.Action == "penalty" {
+		amount = -amount
+	}
+
+	updatedBounty, err := q.UpdateUserBountyQuery(ctx, tx, db.UpdateUserBountyQueryParams{
+		Bounty:     amount,
+		Ghusername: pgtype.Text{String: bountyData.ParticipantUsername, Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update user bounty: %w", err)
+	}
+
+	err = q.AddBountyLogQuery(ctx, tx, db.AddBountyLogQueryParams{
+		Ghusername:   bountyData.ParticipantUsername,
+		DispatchedBy: dispatchedBy,
+		ProofUrl:     bountyData.Url,
+		Amount:       amount,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to add bounty log: %w", err)
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	err = cmd.UpdateLeaderboard(pkg.Valkey, pkg.Leaderboard, bountyData.ParticipantUsername, float64(amount))
+	if err != nil {
+		return fmt.Errorf("failed to update leaderboard: %w", err)
+	}
+
+	return nil
 }
 
 // Super struct to enforce polymorphism
@@ -301,15 +352,9 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 
 		// bounties and penalties
 	} else if action == BountyComment || action == PenaltyComment {
-		jsonData, err := json.Marshal(result.b)
+		err := processBountyOrPenalty(c, result.b, commentBy)
 		if err != nil {
-			pkg.Log.Error(c, "Failed to marshal payload", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
-		err = cmd.AddToStream(pkg.Valkey, pkg.Bounty, string(jsonData))
-		if err != nil {
-			pkg.Log.Error(c, "Failed to insert into Redis", err)
+			pkg.Log.Error(c, "Failed to process bounty/penalty", err)
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
