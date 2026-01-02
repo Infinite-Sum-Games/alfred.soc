@@ -73,7 +73,11 @@ func findCommentator(username string, repoUrl string) (Commentator, error) {
 		return Commentator(UnknownUser), err
 	}
 
-	return Commentator(Participant), nil
+	if ok {
+		return Commentator(Participant), nil
+	}
+
+	return Commentator(UnknownUser), nil
 }
 
 // Claims and unclaims
@@ -212,6 +216,60 @@ func processBountyOrPenalty(bountyData BountyAction, dispatchedBy string) error 
 	return nil
 }
 
+func processAssign(issueData IssueAction) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tx, err := cmd.DBPool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	q := db.New()
+	err = q.IssueAssignQuery(ctx, tx, db.IssueAssignQueryParams{
+		Ghusername: issueData.ParticipantUsername,
+		IssueUrl:   issueData.Url,
+		ClaimedOn:  pgtype.Timestamp{Time: time.Now(), Valid: true},
+		ElapsedOn:  pgtype.Timestamp{Time: time.Now().AddDate(0, 0, 8), Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to assign issue: %w", err)
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+func processUnassign(issueData IssueAction) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tx, err := cmd.DBPool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	q := db.New()
+	_, err = q.IssueUnassignQuery(ctx, tx, db.IssueUnassignQueryParams{
+		Ghusername: issueData.ParticipantUsername,
+		IssueUrl:   issueData.Url,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to unassign issue: %w", err)
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 // Super struct to enforce polymorphism
 type AllowedComment struct {
 	i IssueAction  `json:"issue_action"`
@@ -345,24 +403,36 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 	}
 
 	// No action
-	if action == NoAction {
+	switch action {
+
+	case NoAction:
 		pkg.Log.Info(c, "No action is being performed for issue comment")
 		c.AbortWithStatus(http.StatusOK)
 		return
 
-		// bounties and penalties
-	} else if action == BountyComment || action == PenaltyComment {
+	case BountyComment, PenaltyComment:
+		// DB call
 		err := processBountyOrPenalty(result.b, commentBy)
 		if err != nil {
 			pkg.Log.Error(c, "Failed to process bounty/penalty", err)
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
+		// Redis call
+		jsonData, err := json.Marshal(result.b)
+		if err != nil {
+			pkg.Log.Error(c, "Failed to marshal payload", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		err = cmd.AddToStream(pkg.Valkey, pkg.Bounty, string(jsonData))
+		if err != nil {
+			pkg.Log.Error(c, "Failed to insert into Redis", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
 
-		// achivements
-	} else if action == BugReport || action == DocComment ||
-		action == HelpComment || action == TestComment || action == ImpactComment {
-
+	case BugReport, DocComment, HelpComment, TestComment, ImpactComment:
 		jsonData, err := json.Marshal(result.a)
 		if err != nil {
 			pkg.Log.Error(c, "Failed to marshal payload", err)
@@ -376,8 +446,15 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 			return
 		}
 
-		// assignment
-	} else if action == Assign {
+	case Assign:
+		// Db Call
+		err := processAssign(result.i)
+		if err != nil {
+			pkg.Log.Error(c, "Failed to process assign", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		// Redis Call
 		jsonData, err := json.Marshal(result.i)
 		if err != nil {
 			pkg.Log.Error(c, "Failed to marshal payload", err)
@@ -391,8 +468,15 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 			return
 		}
 
-		// unassignment
-	} else if action == Unassign {
+	case Unassign:
+		// DB Call
+		err := processUnassign(result.i)
+		if err != nil {
+			pkg.Log.Error(c, "Failed to process unassign", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		// Redis call
 		jsonData, err := json.Marshal(result.i)
 		if err != nil {
 			pkg.Log.Error(c, "Failed to marshal payload", err)
@@ -405,8 +489,9 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
-		// extension
-	} else if action == Extend {
+
+	// Currently not being used - "/extend"
+	case Extend:
 		jsonData, err := json.Marshal(result.i)
 		if err != nil {
 			pkg.Log.Error(c, "Failed to marshal payload", err)
