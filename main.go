@@ -84,7 +84,7 @@ func main() {
 
 	router.GET("/api/test", controller.TestEndpointHandler)
 	router.POST("/api/webhook", controller.WebhookHandler)
-	router.POST("/api/webhook/install", controller.InstallationHandler)
+	// router.POST("/api/webhook/install", controller.InstallationHandler)
 
 	port := strconv.Itoa(cmd.AppConfig.ServerPort)
 	pkg.Log.SetupInfo("[ON]: Server configured and starting on PORT:" + port)
