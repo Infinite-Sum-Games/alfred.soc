@@ -35,7 +35,7 @@ var Structures = []StructureInfo{
 	{Name: pkg.JsRank, Type: "zset"},
 	{Name: pkg.GoRank, Type: "zset"},
 	{Name: pkg.RustRank, Type: "zset"},
-	{Name: pkg.ZigRank, Type: "zset"},
+	// {Name: pkg.ZigRank, Type: "zset"},
 	{Name: pkg.FlutterRank, Type: "zset"},
 	{Name: pkg.KotlinRank, Type: "zset"},
 	{Name: pkg.HaskellRank, Type: "zset"},

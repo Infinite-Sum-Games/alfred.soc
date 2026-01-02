@@ -13,7 +13,7 @@ const (
 	IssueClaim = "issue-stream"
 
 	// All automatic workflows are managed by this stream. This includes :
-	// 2. Maintainers : Adding new issues
+	// adding different achievements
 	//
 	// Producer: Alfred (Webhooks)
 	// Consumer: DevPool (GitHub App), Gravemind (Workflows)
