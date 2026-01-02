@@ -18,7 +18,6 @@ import (
 )
 
 func handleIssueEvent(c *gin.Context, payload any) {
-	// Only "labeled, assigned, unassigned, closed, reopened" to be handled
 
 	issueEvent, ok := payload.(*github.IssuesEvent)
 	if !ok {
@@ -32,6 +31,7 @@ func handleIssueEvent(c *gin.Context, payload any) {
 	event := *issueEvent.Action
 
 	switch event {
+
 	case "labeled":
 		label := strings.ToUpper(*issueEvent.Label.Name)
 		if label == "AMSOC-ACCEPTED" {
