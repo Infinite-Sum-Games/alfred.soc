@@ -11,6 +11,28 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addBountyLogQuery = `-- name: AddBountyLogQuery :exec
+INSERT INTO bounty_log (ghUsername, dispatched_by, proof_url, amount)
+VALUES ($1, $2, $3, $4)
+`
+
+type AddBountyLogQueryParams struct {
+	Ghusername   string `json:"ghusername"`
+	DispatchedBy string `json:"dispatched_by"`
+	ProofUrl     string `json:"proof_url"`
+	Amount       int32  `json:"amount"`
+}
+
+func (q *Queries) AddBountyLogQuery(ctx context.Context, db DBTX, arg AddBountyLogQueryParams) error {
+	_, err := db.Exec(ctx, addBountyLogQuery,
+		arg.Ghusername,
+		arg.DispatchedBy,
+		arg.ProofUrl,
+		arg.Amount,
+	)
+	return err
+}
+
 const addIssueTagQuery = `-- name: AddIssueTagQuery :one
 UPDATE issues
 SET tags = array_append(tags, $1),
@@ -266,6 +288,26 @@ func (q *Queries) ParticipantExistsQuery(ctx context.Context, db DBTX, ghusernam
 	return found, err
 }
 
+const updateIssueBountyQuery = `-- name: UpdateIssueBountyQuery :one
+UPDATE issues
+SET
+  bounty_promised = $1
+WHERE url = $2
+RETURNING url
+`
+
+type UpdateIssueBountyQueryParams struct {
+	BountyPromised int32  `json:"bounty_promised"`
+	Url            string `json:"url"`
+}
+
+func (q *Queries) UpdateIssueBountyQuery(ctx context.Context, db DBTX, arg UpdateIssueBountyQueryParams) (string, error) {
+	row := db.QueryRow(ctx, updateIssueBountyQuery, arg.BountyPromised, arg.Url)
+	var url string
+	err := row.Scan(&url)
+	return url, err
+}
+
 const updateIssueDifficultyQuery = `-- name: UpdateIssueDifficultyQuery :one
 UPDATE issues
 SET 
@@ -298,6 +340,26 @@ func (q *Queries) UpdateRepositoryOnDisplayQuery(ctx context.Context, db DBTX, u
 	var name string
 	err := row.Scan(&name)
 	return name, err
+}
+
+const updateUserBountyQuery = `-- name: UpdateUserBountyQuery :one
+UPDATE user_account
+SET
+  bounty = bounty + $1
+WHERE ghUsername = $2
+RETURNING bounty
+`
+
+type UpdateUserBountyQueryParams struct {
+	Bounty     int32       `json:"bounty"`
+	Ghusername pgtype.Text `json:"ghusername"`
+}
+
+func (q *Queries) UpdateUserBountyQuery(ctx context.Context, db DBTX, arg UpdateUserBountyQueryParams) (int32, error) {
+	row := db.QueryRow(ctx, updateUserBountyQuery, arg.Bounty, arg.Ghusername)
+	var bounty int32
+	err := row.Scan(&bounty)
+	return bounty, err
 }
 
 const verifyRepositoryQuery = `-- name: VerifyRepositoryQuery :one

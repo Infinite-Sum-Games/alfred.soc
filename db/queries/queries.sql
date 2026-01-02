@@ -121,3 +121,21 @@ UPDATE repository
 SET on_display = TRUE
 WHERE url = $1
 RETURNING name;
+
+-- name: UpdateIssueBountyQuery :one
+UPDATE issues
+SET
+  bounty_promised = $1
+WHERE url = $2
+RETURNING url;
+
+-- name: UpdateUserBountyQuery :one
+UPDATE user_account
+SET
+  bounty = bounty + $1
+WHERE ghUsername = $2
+RETURNING bounty;
+
+-- name: AddBountyLogQuery :exec
+INSERT INTO bounty_log (ghUsername, dispatched_by, proof_url, amount)
+VALUES ($1, $2, $3, $4);
