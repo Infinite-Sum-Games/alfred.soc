@@ -60,3 +60,14 @@ func AddToStream(client *redis.Client, key string, value string) error {
 	}
 	return nil
 }
+
+func UpdateLeaderboard(client *redis.Client, key string, member string, increment float64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := client.ZIncrBy(ctx, key, increment, member).Result()
+	if err != nil {
+		return fmt.Errorf("Failed to update leaderboard: %v", err)
+	}
+	return nil
+}
