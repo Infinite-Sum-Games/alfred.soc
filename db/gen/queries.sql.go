@@ -286,6 +286,20 @@ func (q *Queries) UpdateIssueDifficultyQuery(ctx context.Context, db DBTX, arg U
 	return url, err
 }
 
+const updateRepositoryOnDisplayQuery = `-- name: UpdateRepositoryOnDisplayQuery :one
+UPDATE repository
+SET on_display = TRUE
+WHERE url = $1
+RETURNING name
+`
+
+func (q *Queries) UpdateRepositoryOnDisplayQuery(ctx context.Context, db DBTX, url string) (string, error) {
+	row := db.QueryRow(ctx, updateRepositoryOnDisplayQuery, url)
+	var name string
+	err := row.Scan(&name)
+	return name, err
+}
+
 const verifyRepositoryQuery = `-- name: VerifyRepositoryQuery :one
 UPDATE repository 
   SET linked = TRUE

@@ -115,3 +115,9 @@ FROM
     solutions
 WHERE
     url = $1;
+
+-- name: UpdateRepositoryOnDisplayQuery :one
+UPDATE repository
+SET on_display = TRUE
+WHERE url = $1
+RETURNING name;
