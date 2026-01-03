@@ -117,6 +117,12 @@ func handlePullRequestEvent(c *gin.Context, payload any) {
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
+			err = cmd.UpdateLeaderboard(pkg.Valkey, pkg.Leaderboard, username, 0.001)
+			if err != nil {
+				pkg.Log.Error(c, "Failed to update leaderboard", err)
+				c.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
 		} else {
 			_, err := q.DeleteSolutionQuery(ctx, tx, prUrl)
 			if err != nil {
