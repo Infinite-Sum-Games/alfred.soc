@@ -46,6 +46,7 @@ func handlePullRequestEvent(c *gin.Context, payload any) {
 
 	switch action {
 	case "opened":
+		// DB Call
 		_, err := q.AddSolutionQuery(ctx, tx, db.AddSolutionQueryParams{
 			Url:        prUrl,
 			RepoUrl:    repoUrl,
@@ -56,8 +57,7 @@ func handlePullRequestEvent(c *gin.Context, payload any) {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
-
-		// Marshal data to send to redis
+		// Redis Call
 		jsonData, err := json.Marshal(Solution{
 			Username: username,
 			Url:      prUrl,
@@ -68,8 +68,6 @@ func handlePullRequestEvent(c *gin.Context, payload any) {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
-
-		// Update redis for further processing of achievements
 		err = cmd.AddToStream(pkg.Valkey, pkg.SolutionMerge, string(jsonData))
 		if err != nil {
 			pkg.Log.Error(c, "Failed to insert into Redis", err)
@@ -78,6 +76,7 @@ func handlePullRequestEvent(c *gin.Context, payload any) {
 		}
 	case "closed":
 		if isMerged {
+			// DB Call
 			ok, err := q.CheckIfSolutionExist(ctx, tx, prUrl)
 			if err != nil {
 				pkg.Log.Error(c, "Could not check if solution exist", err)
@@ -101,8 +100,7 @@ func handlePullRequestEvent(c *gin.Context, payload any) {
 				c.AbortWithStatus(http.StatusBadRequest)
 				return
 			}
-
-			// Marshal data to send to redis
+			// Redis Call
 			jsonData, err := json.Marshal(Solution{
 				Username: username,
 				Url:      prUrl,
@@ -113,8 +111,6 @@ func handlePullRequestEvent(c *gin.Context, payload any) {
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
-
-			// Update redis for further processing of achievements
 			err = cmd.AddToStream(pkg.Valkey, pkg.SolutionMerge, string(jsonData))
 			if err != nil {
 				pkg.Log.Error(c, "Failed to insert into Redis", err)
