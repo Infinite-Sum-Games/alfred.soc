@@ -39,7 +39,7 @@ const (
 
 	Assign
 	Unassign
-	Extend
+	// Extend
 
 	NoAction
 )
@@ -85,7 +85,7 @@ type IssueAction struct {
 	ParticipantUsername string `json:"github_username"`
 	Url                 string `json:"url"`
 	Claimed             bool   `json:"claimed"`
-	Extend              bool   `json:"extend"`
+	// Extend              bool   `json:"extend"`
 }
 
 // Serialize the data and drop it inside Redis
@@ -105,6 +105,7 @@ func marshalUnassign(username string, issueUrl string) IssueAction {
 	}
 }
 
+/*
 func handleExtension(username string, days int, issueUrl string) (IssueAction, error) {
 	fmt.Println(username, days, issueUrl)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -136,6 +137,7 @@ func handleExtension(username string, days int, issueUrl string) (IssueAction, e
 		Extend:              true,
 	}, err
 }
+*/
 
 // Bounties and penalties
 type BountyAction struct {
@@ -216,60 +218,6 @@ func processBountyOrPenalty(bountyData BountyAction, dispatchedBy string) error 
 	return nil
 }
 
-func processAssign(issueData IssueAction) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	tx, err := cmd.DBPool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	q := db.New()
-	err = q.IssueAssignQuery(ctx, tx, db.IssueAssignQueryParams{
-		Ghusername: issueData.ParticipantUsername,
-		IssueUrl:   issueData.Url,
-		ClaimedOn:  pgtype.Timestamp{Time: time.Now(), Valid: true},
-		ElapsedOn:  pgtype.Timestamp{Time: time.Now().AddDate(0, 0, 8), Valid: true},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to assign issue: %w", err)
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
-}
-
-func processUnassign(issueData IssueAction) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	tx, err := cmd.DBPool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	q := db.New()
-	_, err = q.IssueUnassignQuery(ctx, tx, db.IssueUnassignQueryParams{
-		Ghusername: issueData.ParticipantUsername,
-		IssueUrl:   issueData.Url,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to unassign issue: %w", err)
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
-}
-
 // Super struct to enforce polymorphism
 type AllowedComment struct {
 	i IssueAction  `json:"issue_action"`
@@ -281,95 +229,83 @@ func parseComment(cm string, by Commentator, username string,
 	url string) (Comment, AllowedComment, error) {
 
 	cm = strings.TrimSpace(cm)
-	if by == Participant {
+	switch by {
+
+	case Participant:
 		if strings.HasPrefix(cm, "/assign") {
 			data := marshalAssign(username, url)
 			return Comment(Assign), AllowedComment{i: data}, nil
 		} else if strings.HasPrefix(cm, "/unassign") {
 			data := marshalUnassign(username, url)
 			return Comment(Unassign), AllowedComment{i: data}, nil
-		} else {
+		}
+
+	case Maintainer:
+		parts := strings.Split(cm, " ")
+		if len(parts) < 2 {
 			return Comment(NoAction), AllowedComment{}, nil
 		}
 
-	} else if by == Maintainer {
-		if strings.HasPrefix(cm, "/bounty") {
-			comment := strings.Split(cm, " ")
-			if len(comment) != 3 {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
+		command := parts[0] // Contains bounty or penalty
+		args := parts[1:]   // Contains [amount] [username]
+
+		switch command {
+		case "/bounty", "/penalty":
+			if len(args) != 2 {
+				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax for %s", command)
 			}
-			amt, err := strconv.Atoi(comment[1])
+			amt, err := strconv.Atoi(args[0])
 			if err != nil {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
+				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid amount for %s", command)
 			}
-			data := marshalAmt(comment[2], amt, "bounty", url)
-			return Comment(BountyComment), AllowedComment{b: data}, nil
-		} else if strings.HasPrefix(cm, "/penalty") {
-			comment := strings.Split(cm, " ")
-			if len(comment) != 3 {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
+			action := "BOUNTY"
+			commentType := BountyComment
+			if command == "/penalty" {
+				action = "PENALTY"
+				commentType = PenaltyComment
 			}
-			amt, err := strconv.Atoi(comment[1])
-			if err != nil {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
+			username := strings.TrimPrefix(args[1], "@")
+			data := marshalAmt(username, amt, action, url)
+			return commentType, AllowedComment{b: data}, nil
+		case "/help", "/doc", "/test", "/impact", "/bug":
+			if len(args) != 1 {
+				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax for %s", command)
 			}
-			data := marshalAmt(comment[2], amt, "penalty", url)
-			return Comment(PenaltyComment), AllowedComment{b: data}, nil
-		} else if strings.HasPrefix(cm, "/help") {
-			comment := strings.Split(cm, " ")
-			if len(comment) != 2 {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
+			var commentType Comment
+			switch command {
+			case "/help":
+				commentType = HelpComment
+			case "/doc":
+				commentType = DocComment
+			case "/test":
+				commentType = TestComment
+			case "/impact":
+				commentType = ImpactComment
+			case "/bug":
+				commentType = BugReport
 			}
-			data := marshalAchievement(comment[1], "help", url)
-			return Comment(HelpComment), AllowedComment{a: data}, nil
-		} else if strings.HasPrefix(cm, "/doc") {
-			comment := strings.Split(cm, " ")
-			if len(comment) != 2 {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
-			}
-			data := marshalAchievement(comment[1], "doc", url)
-			return Comment(DocComment), AllowedComment{a: data}, nil
-		} else if strings.HasPrefix(cm, "/test") {
-			comment := strings.Split(cm, " ")
-			if len(comment) != 2 {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
-			}
-			data := marshalAchievement(comment[1], "test", url)
-			return Comment(TestComment), AllowedComment{a: data}, nil
-		} else if strings.HasPrefix(cm, "/impact") {
-			comment := strings.Split(cm, " ")
-			if len(comment) != 2 {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
-			}
-			data := marshalAchievement(comment[1], "impact", url)
-			return Comment(ImpactComment), AllowedComment{a: data}, nil
-		} else if strings.HasPrefix(cm, "/extend") {
-			comment := strings.Split(cm, " ")
-			if len(comment) != 3 {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
-			}
-			days, err := strconv.Atoi(comment[1])
-			if err != nil {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
-			}
-			data, err := handleExtension(comment[2][1:], days, url)
-			if err != nil {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Failed to grant extension: %w", err)
-			}
-			return Comment(Extend), AllowedComment{i: data}, nil
-		} else if strings.HasPrefix(cm, "/bug") {
-			comment := strings.Split(cm, " ")
-			if len(comment) != 2 {
-				return Comment(NoAction), AllowedComment{}, fmt.Errorf("Invalid comment syntax")
-			}
-			data := marshalAchievement(username, "bug", url)
-			return Comment(BugReport), AllowedComment{a: data}, nil
-		} else {
-			return Comment(NoAction), AllowedComment{}, nil
+			username := strings.TrimPrefix(args[0], "@")
+			data := marshalAchievement(username, strings.ToUpper(command[1:]), url)
+			return commentType, AllowedComment{a: data}, nil
 		}
 	}
-	// Neither maintainer nor participant, do not process
 	return Comment(NoAction), AllowedComment{}, nil
+}
+
+func sendToStream(c *gin.Context, streamName string, data any) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		pkg.Log.Error(c, "Failed to marshal payload", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return err
+	}
+	err = cmd.AddToStream(pkg.Valkey, streamName, string(jsonData))
+	if err != nil {
+		pkg.Log.Error(c, "Failed to insert into Redis", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return err
+	}
+	return nil
 }
 
 // This function only handles the parsed results and sends them to appropriate
@@ -412,6 +348,7 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 
 	case BountyComment, PenaltyComment:
 		// DB call
+		fmt.Println(result.b.ParticipantUsername)
 		err := processBountyOrPenalty(result.b, commentBy)
 		if err != nil {
 			pkg.Log.Error(c, "Failed to process bounty/penalty", err)
@@ -419,91 +356,42 @@ func handleIssueCommentEvent(c *gin.Context, payload any) {
 			return
 		}
 		// Redis call
-		jsonData, err := json.Marshal(result.b)
-		if err != nil {
-			pkg.Log.Error(c, "Failed to marshal payload", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
-		err = cmd.AddToStream(pkg.Valkey, pkg.Bounty, string(jsonData))
-		if err != nil {
-			pkg.Log.Error(c, "Failed to insert into Redis", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
+		if err := sendToStream(c, pkg.Bounty, result.b); err != nil {
 			return
 		}
 
 	case BugReport, DocComment, HelpComment, TestComment, ImpactComment:
-		jsonData, err := json.Marshal(result.a)
-		if err != nil {
-			pkg.Log.Error(c, "Failed to marshal payload", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
-		err = cmd.AddToStream(pkg.Valkey, pkg.AutomaticEvents, string(jsonData))
-		if err != nil {
-			pkg.Log.Error(c, "Failed to insert into Redis", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
+		if err := sendToStream(c, pkg.AutomaticEvents, result.a); err != nil {
 			return
 		}
 
 	case Assign:
-		// Db Call
-		err := processAssign(result.i)
-		if err != nil {
-			pkg.Log.Error(c, "Failed to process assign", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
 		// Redis Call
-		jsonData, err := json.Marshal(result.i)
-		if err != nil {
-			pkg.Log.Error(c, "Failed to marshal payload", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
-		err = cmd.AddToStream(pkg.Valkey, pkg.IssueClaim, string(jsonData))
-		if err != nil {
-			pkg.Log.Error(c, "Failed to insert into Redis", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
+		if err := sendToStream(c, pkg.IssueClaim, result.i); err != nil {
 			return
 		}
 
 	case Unassign:
-		// DB Call
-		err := processUnassign(result.i)
-		if err != nil {
-			pkg.Log.Error(c, "Failed to process unassign", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
 		// Redis call
-		jsonData, err := json.Marshal(result.i)
-		if err != nil {
-			pkg.Log.Error(c, "Failed to marshal payload", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
+		if err := sendToStream(c, pkg.IssueClaim, result.i); err != nil {
 			return
 		}
-		err = cmd.AddToStream(pkg.Valkey, pkg.IssueClaim, string(jsonData))
-		if err != nil {
-			pkg.Log.Error(c, "Failed to insert into Redis", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
-
-	// Currently not being used - "/extend"
-	case Extend:
-		jsonData, err := json.Marshal(result.i)
-		if err != nil {
-			pkg.Log.Error(c, "Failed to marshal payload", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
-		err = cmd.AddToStream(pkg.Valkey, pkg.IssueClaim, string(jsonData))
-		if err != nil {
-			pkg.Log.Error(c, "Failed to insert into Redis", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
+		/*
+			// Currently not being used - "/extend"
+			case Extend:
+				jsonData, err := json.Marshal(result.i)
+				if err != nil {
+					pkg.Log.Error(c, "Failed to marshal payload", err)
+					c.AbortWithStatus(http.StatusInternalServerError)
+					return
+				}
+				err = cmd.AddToStream(pkg.Valkey, pkg.IssueClaim, string(jsonData))
+				if err != nil {
+					pkg.Log.Error(c, "Failed to insert into Redis", err)
+					c.AbortWithStatus(http.StatusInternalServerError)
+					return
+				}
+		*/
 	}
 
 	c.JSON(http.StatusOK, gin.H{
