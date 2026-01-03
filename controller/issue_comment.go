@@ -184,7 +184,7 @@ func processBountyOrPenalty(bountyData BountyAction, dispatchedBy string) error 
 	q := db.New()
 
 	amount := int32(bountyData.Amount)
-	if bountyData.Action == "penalty" {
+	if bountyData.Action == "PENALTY" {
 		amount = -amount
 	}
 
